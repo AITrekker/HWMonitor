@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Single-file publish for easy distribution -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <!-- Add SplashScreen -->
+    <ApplicationDefinition>App.xaml</ApplicationDefinition>
+    <!-- Add application manifest for admin privileges -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>HwMonitor.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Authors>Amit Gupta - AITrekker</Authors>
+    <Description>Hardware monitoring application that displays CPU, GPU, and storage metrics</Description>
+    <Copyright>Copyright © 2024 Amit Gupta - AITrekker</Copyright>
+    <RepositoryUrl>https://github.com/AITrekker/HwMonitor</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/AITrekker/HwMonitor</PackageProjectUrl>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Sensor library - updated to available version -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.5-pre412" />
+    <!-- Charting library -->
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="HwMonitor.ico" />
+  </ItemGroup>
+</Project>
