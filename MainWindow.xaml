@@ -4,9 +4,10 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HardwareMonitorApp"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
-        Title="Hardware Monitor" Height="500" Width="380"
-        SizeToContent="WidthAndHeight" MinWidth="320">
+        Title="Hardware Monitor" Height="1220" Width="1410"
+        MinWidth="1000" MinHeight="700" WindowStartupLocation="CenterScreen">
     
     <Window.Resources>
         <!-- Common styles -->
@@ -44,7 +45,35 @@
         
         <!-- Top Control Panel -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-            
+            <Button x:Name="ToggleViewButton" Content="📋 Classic View" 
+                    Click="ToggleView_Click" 
+                    Padding="12,8" 
+                    Background="#667eea" 
+                    Foreground="White" 
+                    BorderBrush="Transparent"
+                    FontWeight="SemiBold"
+                    Cursor="Hand">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" 
+                                            CornerRadius="8" 
+                                            Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#764ba2"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Button.Style>
+            </Button>
         </StackPanel>
         
         <!-- Views Container -->
@@ -133,6 +162,13 @@
                         </GroupBox>
                     </StackPanel>
                 </ScrollViewer>
+            </Grid>
+            
+            <!-- Dashboard View -->
+            <Grid x:Name="DashboardView" Visibility="Collapsed">
+                <wv2:WebView2 x:Name="DashboardWebView" 
+                             Source="about:blank"
+                             NavigationCompleted="DashboardWebView_NavigationCompleted"/>
             </Grid>
         </Grid>
     </Grid>

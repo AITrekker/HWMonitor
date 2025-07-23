@@ -22,6 +22,9 @@ using System.Windows.Controls;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using System.Security.Principal;
+using System.IO;
+using Microsoft.Web.WebView2.Core;
+using System.Text.Json;
 
 namespace HardwareMonitorApp
 {
@@ -32,7 +35,9 @@ namespace HardwareMonitorApp
         private DispatcherTimer _updateTimer;
         private DateTime _lastUpdateTime = DateTime.Now;
         
-        // Constants
+        // Dashboard components
+        private bool _isDashboardView = true;  // Start in dashboard view
+        private bool _dashboardInitialized = false;
         
         // Thread safety
         private bool _updateInProgress = false;
@@ -64,7 +69,8 @@ namespace HardwareMonitorApp
                     Dispatcher.Invoke(() => 
                     {
                         UpdateAdminStatus();
-                        ShowView("NumericView");
+                        ShowView("DashboardView");
+                        InitializeDashboard();
                         InitializeUI();
                     });
                 }
@@ -83,6 +89,9 @@ namespace HardwareMonitorApp
             
             if (FindName("LoadingView") is Grid loadingView) 
                 loadingView.Visibility = viewName == "LoadingView" ? Visibility.Visible : Visibility.Collapsed;
+                
+            if (FindName("DashboardView") is Grid dashboardView) 
+                dashboardView.Visibility = viewName == "DashboardView" ? Visibility.Visible : Visibility.Collapsed;
         }
         
         // Initialize UI components
@@ -176,6 +185,9 @@ namespace HardwareMonitorApp
                 UpdateTextValue("CpuLoadText", cpuLoad, "{0:F1} %");
                 UpdateTextValue("GpuLoadText", gpuLoad, "{0:F1} %");
                 UpdateItemsControl("DiskTempsItemsControl", diskTemps, "{0:F1} °C");
+                
+                // Send data to dashboard if it's active
+                SendDataToDashboard(cpuTemp, gpuTemp, memoryTemp, cpuLoad, gpuLoad, diskTemps);
             });
         }
         
@@ -279,6 +291,140 @@ namespace HardwareMonitorApp
         private void HandleError(string context, Exception ex)
         {
             LogHelper.LogError($"{context}: {ex.Message}", ex);
+        }
+
+        // Dashboard view toggle
+        private void ToggleView_Click(object sender, RoutedEventArgs e)
+        {
+            _isDashboardView = !_isDashboardView;
+            
+            if (_isDashboardView)
+            {
+                ShowView("DashboardView");
+                ToggleViewButton.Content = "📋 Classic View";
+                if (!_dashboardInitialized)
+                {
+                    InitializeDashboard();
+                }
+            }
+            else
+            {
+                ShowView("NumericView");
+                ToggleViewButton.Content = "📊 Dashboard View";
+                this.WindowState = WindowState.Normal;
+            }
+        }
+
+        // Initialize the dashboard WebView2
+        private void InitializeDashboard()
+        {
+            if (_dashboardInitialized) return;
+            
+            try
+            {
+                var dashboardPath = Path.Combine(AppContext.BaseDirectory, "dashboard.html");
+                if (File.Exists(dashboardPath))
+                {
+                    DashboardWebView.Source = new Uri($"file:///{dashboardPath.Replace('\\', '/')}");
+                    _dashboardInitialized = true;
+                }
+                else
+                {
+                    LogHelper.LogError("Dashboard file not found", new FileNotFoundException($"Could not find dashboard.html at {dashboardPath}"));
+                }
+            }
+            catch (Exception ex)
+            {
+                HandleError("Dashboard initialization", ex);
+            }
+        }
+
+        // Handle WebView2 navigation completion
+        private async void DashboardWebView_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
+        {
+            if (e.IsSuccess && _dashboardInitialized)
+            {
+                LogHelper.Log("Dashboard WebView2 navigation completed successfully");
+                
+                // Wait a moment for the page to fully load
+                await Task.Delay(1000);
+                
+                // Add JavaScript for WebView2 message handling
+                await DashboardWebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(@"
+                    console.log('C# script injection successful');
+                    
+                    window.chrome.webview.addEventListener('message', function(event) {
+                        console.log('Message received from C#:', event.data);
+                        try {
+                            let messageData = event.data;
+                            if (typeof messageData === 'string') {
+                                messageData = JSON.parse(messageData);
+                            }
+                            
+                            if (messageData.type === 'sensorData') {
+                                // Update the global hardware monitor instance with real data
+                                if (window.hardwareMonitorInstance) {
+                                    const data = messageData.data;
+                                    data.timestamp = new Date(data.timestamp);
+                                    window.hardwareMonitorInstance.updateUI(data);
+                                } else {
+                                    console.error('hardwareMonitorInstance not found');
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error processing message:', error);
+                        }
+                    });
+                ");
+                
+                LogHelper.Log("Dashboard JavaScript injection completed");
+            }
+            else if (!e.IsSuccess)
+            {
+                LogHelper.LogError("Dashboard navigation failed", new Exception($"Navigation failed for WebView2"));
+            }
+        }
+
+        // Send sensor data to dashboard
+        private void SendDataToDashboard(float? cpuTemp, float? gpuTemp, float? memoryTemp,
+                                         float? cpuLoad, float? gpuLoad,
+                                         Dictionary<string, float?> diskTemps)
+        {
+            if (!_isDashboardView || !_dashboardInitialized)
+                return;
+
+            try
+            {
+                // Ensure WebView2 is ready
+                if (DashboardWebView.CoreWebView2 == null)
+                {
+                    LogHelper.Log("WebView2 CoreWebView2 is null, skipping data update");
+                    return;
+                }
+
+                var data = new
+                {
+                    type = "sensorData",
+                    data = new
+                    {
+                        cpuTemp = cpuTemp,
+                        cpuLoad = cpuLoad,
+                        gpuTemp = gpuTemp,
+                        gpuLoad = gpuLoad,
+                        memoryTemp = memoryTemp,
+                        diskTemps = diskTemps?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                        timestamp = DateTime.Now.ToString("o")
+                    }
+                };
+
+                var json = JsonSerializer.Serialize(data);
+                LogHelper.Log($"Sending data to dashboard: {json}");
+                DashboardWebView.CoreWebView2.PostWebMessageAsString(json);
+            }
+            catch (Exception ex)
+            {
+                LogHelper.LogError("Dashboard data update", ex);
+            }
         }
     }
 }

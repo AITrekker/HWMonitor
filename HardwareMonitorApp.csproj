@@ -24,9 +24,13 @@
   <ItemGroup>
     <!-- Sensor library - updated to available version -->
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.5-pre412" />
-    <!-- Charting library -->
+    <!-- WebView2 for modern HTML/JS dashboard -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2420.47" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="HwMonitor.ico" />
+    <Content Include="dashboard.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 </Project>

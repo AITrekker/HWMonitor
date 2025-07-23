@@ -149,7 +149,16 @@ namespace HardwareMonitorApp
         public float? GetCpuTemperature() 
         {
             Update();
-            return GetSensorValue(HardwareType.Cpu, SensorType.Temperature);
+            var temp = GetSensorValue(HardwareType.Cpu, SensorType.Temperature);
+            
+            // Validate temperature is reasonable (0-150°C)
+            if (temp.HasValue && (temp.Value < 0 || temp.Value > 150))
+            {
+                LogHelper.LogError($"Invalid CPU temperature reading: {temp.Value}°C", new Exception("Temperature out of range"));
+                return null;
+            }
+            
+            return temp;
         }
             
         public float? GetCpuLoad() => GetSensorValue(HardwareType.Cpu, SensorType.Load, "Total");
@@ -180,7 +189,11 @@ namespace HardwareMonitorApp
                 if (memory != null)
                 {
                     var temp = memory.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature)?.Value;
-                    if (temp.HasValue) return temp;
+                    if (temp.HasValue && temp.Value > 0 && temp.Value < 150) 
+                    {
+                        LogHelper.Log($"Memory temperature from memory hardware: {temp.Value}°C");
+                        return temp;
+                    }
                 }
                 
                 // Try motherboard memory sensors
@@ -192,13 +205,25 @@ namespace HardwareMonitorApp
                         var temp = hardware.Sensors
                             .FirstOrDefault(s => s.SensorType == SensorType.Temperature && 
                                      (s.Name.Contains("Memory") || s.Name.Contains("RAM")))?.Value;
-                        if (temp.HasValue) return temp;
+                        if (temp.HasValue && temp.Value > 0 && temp.Value < 150)
+                        {
+                            LogHelper.Log($"Memory temperature from motherboard: {temp.Value}°C");
+                            return temp;
+                        }
                     }
                 }
                 
                 // Fallback: approximate from CPU
                 var cpuTemp = GetCpuTemperature();
-                return cpuTemp.HasValue ? cpuTemp.Value - 5 : null;
+                if (cpuTemp.HasValue && cpuTemp.Value > 0 && cpuTemp.Value < 150)
+                {
+                    var estimatedMemTemp = cpuTemp.Value - 5;
+                    LogHelper.Log($"Memory temperature estimated from CPU: {estimatedMemTemp}°C");
+                    return estimatedMemTemp;
+                }
+                
+                LogHelper.Log("No valid memory temperature found");
+                return null;
             }
             catch (Exception ex)
             {
